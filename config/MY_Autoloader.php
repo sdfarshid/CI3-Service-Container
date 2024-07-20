@@ -7,7 +7,7 @@ spl_autoload_register(function ($className) {
     $baseDir = APPPATH . 'libraries/';
 
     // change Namespace to path
-    $class = str_replace('\\', '/', $className) . '.php';
+    $class = str_replace('\\', DIRECTORY_SEPARATOR , $className) . '.php';
 
     //  require_once file
     $file = $baseDir . $class;
