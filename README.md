@@ -109,6 +109,10 @@ Use the `bind` method to register a service with a custom resolver:
 $container->bind('Logger', function ($container) {
     return new Logger();
 });
+//or 
+$container->bind('Logger',Logger::class);
+//or 
+$container->bind(Logger::class,Logger::class);
 ```
 
 ### Registering a Service
