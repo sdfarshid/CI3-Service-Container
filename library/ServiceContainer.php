@@ -130,9 +130,21 @@ class ServiceContainer {
 
     // Bind a resolver to a key
     public function bind($key, $resolver) {
-        $this->bindings[$key] = $resolver;
-    }
+        //bind  if  resolver was a Class Auto resolve dependencies
+        if (is_string($resolver) && class_exists($resolver)) {
+            $this->bindings[$key] = function ($container) use ($resolver) {
+                return $container->resolve($resolver);
+            };
+        }
+        //bind  if the resolver was a Closure
+        elseif ($resolver instanceof Closure) {
+            $this->bindings[$key] = $resolver;
+        }
+        else {
+            throw new Exception("Invalid resolver for binding '{$key}'.");
+        }
 
+    }
     // Manually create or resolve a service
     public function make($key)
     {
