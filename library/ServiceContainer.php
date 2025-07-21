@@ -127,7 +127,7 @@ class ServiceContainer {
             return $this->resolveDependenciesAndInstantiate($resolver);
         }
 
-        throw new Exception("Cannot register '{$key}'. Invalid resolver provided.");
+        throw new Exception("Cannot register '$key'. Invalid resolver provided.");
     }
 
     public function resolve($abstract)
@@ -145,7 +145,11 @@ class ServiceContainer {
     private function resolveDependenciesAndInstantiate($abstract)
     {
         if (!class_exists($abstract)) {
-            return   $this->bindingInterface($abstract);
+            try {
+                return $this->bindingInterface($abstract);
+            } catch (Exception $e) {
+
+            }
         }
         $reflection = new ReflectionClass($abstract);
         $constructor = $reflection->getConstructor();
