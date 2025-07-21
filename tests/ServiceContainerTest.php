@@ -117,14 +117,14 @@ class ServiceContainerTest {
         $service2 = $this->container->get('TestSingleton');
         $this->assert($service1 === $service2, "Bound services should be singleton");
         
-        echo "✅ Singleton Pattern tests passed\n\n";
+        echo " Singleton Pattern tests passed\n\n";
     }
     
     /**
      * Test service binding functionality
      */
     public function testServiceBinding() {
-        echo "🔍 Testing Service Binding...\n";
+        echo " Testing Service Binding...\n";
         
         // Test closure binding
         $this->container->bind('TestLogger', function() {
@@ -139,14 +139,14 @@ class ServiceContainerTest {
         $loggerClass = $this->container->get('TestLoggerClass');
         $this->assert($loggerClass instanceof MockLogger, "Should bind class correctly");
         
-        echo "✅ Service Binding tests passed\n\n";
+        echo " Service Binding tests passed\n\n";
     }
     
     /**
      * Test automatic dependency injection
      */
     public function testDependencyInjection() {
-        echo "🔍 Testing Dependency Injection...\n";
+        echo " Testing Dependency Injection...\n";
         
         // Setup dependencies
         $this->container->bind('DILogger', MockLogger::class);
@@ -168,14 +168,14 @@ class ServiceContainerTest {
         $config = $userService->getConfig();
         $this->assert($config['app_name'] === 'Test App', "Should inject configuration");
         
-        echo "✅ Dependency Injection tests passed\n\n";
+        echo " Dependency Injection tests passed\n\n";
     }
     
     /**
      * Test interface binding
      */
     public function testInterfaceBinding() {
-        echo "🔍 Testing Interface Binding...\n";
+        echo "Testing Interface Binding...\n";
         
         // This would normally be done in config, but testing manually
         $this->container->bind('MockRepositoryInterface', MockRepository::class);
@@ -186,14 +186,14 @@ class ServiceContainerTest {
         $result = $repo->find(123);
         $this->assert($result['id'] === 123, "Interface implementation should work");
         
-        echo "✅ Interface Binding tests passed\n\n";
+        echo "Interface Binding tests passed\n\n";
     }
     
     /**
      * Test configuration arrays
      */
     public function testConfigurationArrays() {
-        echo "🔍 Testing Configuration Arrays...\n";
+        echo "Testing Configuration Arrays...\n";
         
         $config = [
             'database' => 'test_db',
@@ -207,14 +207,14 @@ class ServiceContainerTest {
         $this->assert($retrievedConfig === $config, "Should store and retrieve arrays");
         $this->assert($retrievedConfig['debug'] === true, "Should maintain array structure");
         
-        echo "✅ Configuration Arrays tests passed\n\n";
+        echo "Configuration Arrays tests passed\n\n";
     }
     
     /**
      * Test difference between make() and get()
      */
     public function testMakeVsGet() {
-        echo "🔍 Testing make() vs get() behavior...\n";
+        echo " Testing make() vs get() behavior...\n";
         
         $this->container->bind('MakeVsGetTest', MockLogger::class);
         
@@ -228,14 +228,14 @@ class ServiceContainerTest {
         $instance4 = $this->container->make('MakeVsGetTest');
         $this->assert($instance3 !== $instance4, "make() should return new instances");
         
-        echo "✅ make() vs get() tests passed\n\n";
+        echo " make() vs get() tests passed\n\n";
     }
     
     /**
      * Test error handling
      */
     public function testErrorHandling() {
-        echo "🔍 Testing Error Handling...\n";
+        echo "Testing Error Handling...\n";
         
         try {
             $this->container->get('NonExistentService');
@@ -251,14 +251,14 @@ class ServiceContainerTest {
             $this->assert(true, "Should throw exception for invalid binding");
         }
         
-        echo "✅ Error Handling tests passed\n\n";
+        echo " Error Handling tests passed\n\n";
     }
     
     /**
      * Test utility methods
      */
     public function testUtilityMethods() {
-        echo "🔍 Testing Utility Methods...\n";
+        echo " Testing Utility Methods...\n";
         
         // Setup some services for testing
         $this->container->bind('UtilityTest1', MockLogger::class);
@@ -278,7 +278,7 @@ class ServiceContainerTest {
         $statuses = $this->container->listServicesWithStatus();
         $this->assert(is_array($statuses), "listServicesWithStatus should return array");
         
-        echo "✅ Utility Methods tests passed\n\n";
+        echo "Utility Methods tests passed\n\n";
     }
     
     /**
@@ -289,7 +289,7 @@ class ServiceContainerTest {
             $this->testResults[] = ['status' => 'PASS', 'message' => $message];
         } else {
             $this->testResults[] = ['status' => 'FAIL', 'message' => $message];
-            echo "❌ FAILED: $message\n";
+            echo " FAILED: $message\n";
         }
     }
     
@@ -306,8 +306,8 @@ class ServiceContainerTest {
         echo "📊 Test Results Summary\n";
         echo "======================\n";
         echo "Total Tests: $total\n";
-        echo "Passed: $passed ✅\n";
-        echo "Failed: $failed " . ($failed > 0 ? "❌" : "") . "\n";
+        echo "Passed: $passed \n";
+        echo "Failed: $failed " . ($failed > 0 ? "" : "") . "\n";
         echo "Success Rate: " . round(($passed / $total) * 100, 2) . "%\n\n";
         
         if ($failed === 0) {
