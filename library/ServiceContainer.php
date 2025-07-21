@@ -1,165 +1,211 @@
 <?php
 if (!defined('BASEPATH')) exit('No direct script access allowed');
 
+
+
 class ServiceContainer {
 
-    // Singleton instance of the ServiceContainer
     protected static $instance = null;
-
-    // Array to hold registered services
     protected $services = [];
-
-    // Array to hold service bindings
     protected $bindings = [];
+    protected $interfaces = [];
+    protected $parameters = [];
+    protected $singletonServices = [];
 
-    // Returns the singleton instance of the ServiceContainer
+    /**
+     * Get the singleton instance of ServiceContainer
+     * Implements the Singleton design pattern to ensure only one instance exists
+     *
+     * @return ServiceContainer The singleton instance
+     */
     public static function getInstance() {
         if (self::$instance === null) {
             self::$instance = new ServiceContainer();
-            self::$instance->registerDefaults(); // Register default bindings and services
+            self::$instance->registerDefaults();
         }
         return self::$instance;
     }
 
-    // Register a service directly with an object
+    private function isSingleton($key)
+    {
+        return isset($this->singletonServices[$key]);
+    }
+
+
     public function set($key, $object) {
         $this->services[$key] = $object;
     }
 
-    // Retrieve a service or resolve it
+    /**
+     * Bind a service to the container with lazy loading
+     * Supports both class names and closure resolvers with automatic dependency injection
+     *
+     * @param string $key The service identifier
+     * @param string|Closure $resolver Class name or closure that returns the service instance
+     * @throws Exception When resolver is invalid
+     */
+    public function bind($key, $resolver) {
+        // Bind if resolver is a class - auto resolve dependencies
+        if (is_string($resolver) && class_exists($resolver)) {
+            $this->bindings[$key] = function ($container) use ($resolver) {
+                return $container->resolve($resolver);
+            };
+        }
+        // Bind if resolver is a closure
+        elseif ($resolver instanceof Closure) {
+            $this->bindings[$key] = $resolver;
+        }
+        else {
+            throw new Exception("Invalid resolver for binding '{$key}'.");
+        }
+    }
+
+    public function register($key, $resolver = null)
+    {
+        try {
+            if (is_array($resolver)) {
+                $this->set($key, $resolver);
+            }
+            elseif (!isset($this->services[$key])) {
+                $resolver = $resolver ?: $key;
+                $this->set($key, $this->resolve($resolver));
+            }
+            return $this->get($key);
+
+        }catch (Exception $exception){
+            throw  $exception ;
+        }
+
+    }
+
     public function get($key)
     {
-        // Check if the service is explicitly registered
         if (isset($this->services[$key])) {
             $service = $this->services[$key];
-            // If the service is a closure, execute it
             if ($service instanceof Closure) {
                 $this->services[$key] = $service($this);
             }
             return $this->services[$key];
         }
-
-        // Check if the service is bound
         if (isset($this->bindings[$key])) {
-            $this->services[$key] = $this->bindings[$key]($this);
-            return $this->services[$key];
-        }
-
-        // Attempt to auto-resolve the service
-        return $this->resolve($key);
-
-        throw new Exception("Service {$key} not found.");
-    }
-
-    // Register a service or a resolver
-    public function register($key, $resolver = null)
-    {
-        if (is_array($resolver)) {
-            $this->set($key, $resolver);
-        }
-        elseif (!isset($this->services[$key])) {
-            $resolver = $resolver ?: $key;
-            $this->set($key, $this->resolve($resolver));
-        }
-        return $this->get($key);
-    }
-
-    // Resolve a service or class with its dependencies
-    public function resolve($abstract)
-    {
-        // Check bindings first
-        if (isset($this->bindings[$abstract])) {
-            return call_user_func($this->bindings[$abstract], $this);
-        }
-
-        // Check registered services
-        if (isset($this->services[$abstract])) {
-            $service = $this->services[$abstract];
-            if ($service instanceof Closure) {
-                $this->services[$abstract] = $service($this);
+            $service = $this->bindings[$key]($this);
+            if ($this->isSingleton($key)) {
+                $this->services[$key] = $service;
             }
-            return $this->services[$abstract];
+            return $service;
         }
 
-        // Auto-resolve classes with dependency injection
-        if (class_exists($abstract)) {
-            $reflectionClass = new ReflectionClass($abstract);
-            $constructor = $reflectionClass->getConstructor();
+        $service = $this->resolve($key);
 
-            if (!$constructor) {
-                return new $abstract; // Instantiate the class if it has no constructor
-            }
-
-            // Resolve dependencies for the constructor
-            $dependencies = $this->getDependencies($constructor->getParameters());
-            return $reflectionClass->newInstanceArgs($dependencies);
+        if ($this->isSingleton($key)) {
+            $this->services[$key] = $service;
         }
 
-        throw new Exception("Cannot resolve '{$abstract}'. It is not a class, binding, or service.");
+        return $service;
+
     }
 
-    // Resolve dependencies for a constructor
-    public function getDependencies($parameters)
-    {
-        $dependencies = [];
-        foreach ($parameters as $parameter) {
-            $dependency = $parameter->getClass(); // Get the type-hinted class
-            if ($dependency === null) {
-                // Handle primitive types or parameters without type hints
-                $parameterName = $parameter->name;
-                if (isset($this->bindings[$parameterName])) {
-                    $dependencies[] = call_user_func($this->bindings[$parameterName]);
-                }
-                elseif ($parameter->isDefaultValueAvailable()) {
-                    $dependencies[] = $parameter->getDefaultValue();
-                } else {
-                    // Special case for CI instance or unresolvable parameters
-                    if (strpos($parameter->name, "CI") !== false) {
-                        $dependencies[] = $this->get('CI_instance');
-                    } else {
-                        throw new Exception("Cannot resolve dependency {$parameter->name}");
-                    }
-                }
-            } else {
-                // Resolve the dependency by its class name
-                $dependencies[] = $this->register($dependency->name);
-            }
-        }
-        return $dependencies;
-    }
-
-    // Bind a resolver to a key
-    public function bind($key, $resolver) {
-        $this->bindings[$key] = $resolver;
-    }
-
-    // Manually create or resolve a service
     public function make($key)
     {
         if (isset($this->bindings[$key])) {
             return $this->bindings[$key]($this);
         }
+        return $this->makeNewInstance($key);
+    }
 
-        if (isset($this->services[$key])) {
-            if ($this->services[$key] instanceof Closure) {
-                return $this->services[$key]($this);
-            }
-            return $this->resolve($key);
+    public function makeNewInstance($key, $resolver = null)
+    {
+        if (is_array($resolver)) {
+            return $this->resolveDependenciesAndInstantiate($resolver);
         }
 
-        throw new Exception("Binding or Service '{$key}' not found.");
+
+        $resolver = $resolver ?: $key;
+
+
+        if (is_string($resolver) && class_exists($resolver)) {
+            return $this->resolveDependenciesAndInstantiate($resolver);
+        }
+
+        throw new Exception("Cannot register '{$key}'. Invalid resolver provided.");
     }
 
-    // Register default bindings and services
+    public function resolve($abstract)
+    {
+
+        if (isset($this->singletonServices[$abstract])) {
+            return $this->get($abstract);
+        }
+
+        return $this->resolveDependenciesAndInstantiate($abstract);
+    }
+
+
+
+    private function resolveDependenciesAndInstantiate($abstract)
+    {
+        if (!class_exists($abstract)) {
+            return   $this->bindingInterface($abstract);
+        }
+        $reflection = new ReflectionClass($abstract);
+        $constructor = $reflection->getConstructor();
+        if (!$constructor) {
+            return new $abstract();
+        }
+        $dependencies = array_map(function ($param) {
+            return $this->resolveParameter($param);
+        }, $constructor->getParameters());
+
+        return $reflection->newInstanceArgs($dependencies);
+    }
+
+    private function bindingInterface($abstract)
+    {
+
+        if (isset($this->interfaces[$abstract])) {
+            return $this->interfaces[$abstract];
+        }
+
+        throw new Exception(" resolveDependenciesAndInstantiate - Class {$abstract} not found.");
+    }
+
+
+    private function resolveParameter(ReflectionParameter $param)
+    {
+        if ($param->getClass()) {
+            return $this->resolve($param->getClass()->name);
+        }
+
+        if ($param->isDefaultValueAvailable()) {
+            return $param->getDefaultValue();
+        }
+
+        if (strpos($param->name, 'CI') !== false) {
+            return $this->get('CI_instance');
+        }
+
+        $paramName = $param->name;
+
+        if (isset($this->parameters[$paramName])) {
+            return $this->parameters[$paramName];
+        }
+
+        throw new Exception("Cannot resolve parameter: {$param->name}");
+    }
+
     private function registerDefaults()
     {
-        $this->bind('CI_instance', function () {
-            return clone get_instance(); // Clone the CI instance
-        });
-        $this->registerDefaultsFromConfig(); // Register services from the config file
+        //From Config File
+        try {
+            $this->registerDefaultsFromConfig();
+
+        }
+        catch (Exception $exception){
+            log_message('error', "Failed to registerDefaults: " . $exception->getMessage());
+        }
     }
 
-    // Load default services from the config file
+
     private function registerDefaultsFromConfig()
     {
         $servicesFilePath = APPPATH . 'config/services.php';
@@ -173,7 +219,8 @@ class ServiceContainer {
             throw new Exception("The services config file must return an array.");
         }
 
-        foreach ($services as $key => $resolver) {
+        // register Singleton Services
+        foreach ($services['singletonServices'] as $key => $resolver) {
             try {
                 if ($resolver instanceof Closure) {
                     $this->bind($key, $resolver);
@@ -183,10 +230,100 @@ class ServiceContainer {
                 } else {
                     $this->set($key, $resolver);
                 }
+                $this->singletonServices [$key]=$key;
+
             } catch (Exception $e) {
-                log_message('error', "Failed to register service '{$key}': " . $e->getMessage());
+                log_message('error', "Failed to register singleton service '{$key}': " . $e->getMessage());
                 continue;
             }
         }
+
+        //register Non-Singleton Services  (bind)
+        foreach ($services['nonSingletonServices'] as $key => $resolver) {
+            try {
+
+                if ($resolver instanceof Closure) {
+                    $this->bind($key, $resolver);
+                }
+                else {
+
+                    $this->bind($key,$resolver );
+                }
+            } catch (Exception $e) {
+                log_message('error', "Failed to register non-singleton service '{$key}': " . $e->getMessage());
+                continue;
+            }
+        }
+
+
+        // register Interfaces as bindings
+        foreach ($services['interfaces'] ?? [] as $interface => $implementation) {
+            if ($implementation instanceof Closure) {
+                $this->bind($interface, $implementation);
+            }
+            else {
+                $this->interfaces [$interface]  = $this->make($implementation);
+            }
+
+        }
+
+
+
+        // register Parameters
+        $this->parameters = $config['parameters'] ?? [];
+
+
+
+
     }
+
+    public function singleton($key, $resolver = null)
+    {
+        if (is_string($resolver) && class_exists($resolver)) {
+            $this->services[$key] = $this->resolve($resolver);
+        } elseif ($resolver instanceof Closure) {
+            $this->services[$key] = $resolver($this);
+        } else {
+            throw new Exception("Invalid resolver for singleton '{$key}'.");
+        }
+    }
+
+
+    public function getServices(): array
+    {
+        return $this->services;
+    }
+    public function listServices(): array
+    {
+        return array_keys($this->services);
+    }
+    public function listServicesWithStatus(): array
+    {
+        $status = [];
+        foreach ($this->services as $key => $service) {
+            $status[$key] = is_object($service) ? 'Registered' : 'Not Registered';
+        }
+        return $status;
+    }
+    /**
+     * @return array
+     */
+    public function getBindings(): array
+    {
+        return $this->bindings;
+    }
+    /**
+     * @return array
+     */
+    public function listBindings(): array
+    {
+        return array_keys($this->bindings);
+    }
+    public function listSingleton(): array
+    {
+        return $this->singletonServices;
+    }
+
+
 }
+
